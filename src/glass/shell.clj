@@ -1,4 +1,4 @@
-(ns aktopia.glass.shell
+(ns glass.shell
   (:require
    [clojure.java.io :as io])
   (:import

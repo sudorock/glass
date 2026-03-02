@@ -1,4 +1,4 @@
-(ns aktopia.glass.timestamp
+(ns glass.timestamp
   "Functions for working with time instants represented in epoch milliseconds."
   (:import
    [java.time.format DateTimeFormatter]

@@ -1,4 +1,4 @@
-(ns aktopia.glass.keyword
+(ns glass.keyword
   (:require
    [clojure.walk :as walk]))
 

@@ -1,4 +1,4 @@
-(ns aktopia.glass.uuid
+(ns glass.uuid
   (:import
    (java.util UUID)))
 
