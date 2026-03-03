@@ -4,8 +4,8 @@
         clj-log4j2/clj-log4j2 {:mvn/version "0.4.0"}
         hato/hato {:mvn/version "1.0.0"}
         jarohen/chime {:mvn/version "0.3.3"}
-        org.clojure/clojure {:mvn/version "1.11.1"}
-        org.mnode.ical4j/ical4j {:mvn/version "4.1.1"}}
+        org.clojure/clojure {:mvn/version "1.12.4"}
+        org.mnode.ical4j/ical4j {:mvn/version "4.2.3"}}
  :aliases {:test {:extra-deps {io.github.cognitect-labs/test-runner
                                {:git/tag "v0.5.1"
                                 :git/sha "dfb30dd"}}
