@@ -4,8 +4,14 @@
         clj-log4j2/clj-log4j2 {:mvn/version "0.4.0"}
         hato/hato {:mvn/version "1.0.0"}
         jarohen/chime {:mvn/version "0.3.3"}
+        metosin/muuntaja {:mvn/version "0.6.11"}
+        metosin/reitit-malli {:mvn/version "0.9.1"}
+        metosin/reitit-middleware {:mvn/version "0.9.1"}
+        metosin/reitit-ring {:mvn/version "0.9.1"}
+        nrepl/nrepl {:mvn/version "1.5.2"}
         org.clojure/clojure {:mvn/version "1.12.4"}
-        org.mnode.ical4j/ical4j {:mvn/version "4.2.3"}}
+        org.mnode.ical4j/ical4j {:mvn/version "4.2.3"}
+        ring/ring-jetty-adapter {:mvn/version "1.14.2"}}
  :aliases {:test {:extra-deps {io.github.cognitect-labs/test-runner
                                {:git/tag "v0.5.1"
                                 :git/sha "dfb30dd"}}
