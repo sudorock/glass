@@ -19,6 +19,10 @@
   [url opts]
   (client/post url (merge (default-opts) opts)))
 
+(defn put
+  [url opts]
+  (client/put url (merge (default-opts) opts)))
+
 (defn patch
   [url opts]
   (client/patch url (merge (default-opts) opts)))
