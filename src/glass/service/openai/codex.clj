@@ -9,8 +9,6 @@
 
 (def ^:private method-not-found -32601)
 
-(def ^:private denied-review-decision "denied")
-
 (defn- default-server-request-handler
   [{:keys [method]}]
   (case method
@@ -21,10 +19,10 @@
     {:result {:decision "decline"}}
 
     "applyPatchApproval"
-    {:result {:decision denied-review-decision}}
+    {:result {:decision "denied"}}
 
     "execCommandApproval"
-    {:result {:decision denied-review-decision}}
+    {:result {:decision "denied"}}
 
     nil))
 
