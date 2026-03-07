@@ -25,7 +25,13 @@
   {:process process
    :reader (ensure-reader reader)
    :writer (ensure-writer writer)
-   :id-counter (atom 0)})
+   :id-counter (atom 0)
+   :transport-lock (Object.)})
+
+(defn- with-transport-lock
+  [codex f]
+  (locking (:transport-lock codex)
+    (f)))
 
 (defn- start-process
   []
@@ -126,20 +132,26 @@
 
 (defn- request!
   [codex method params]
-  (let [id (next-id codex)]
-    (write-message! codex
-                    (cond-> {:id id
-                             :method method}
-                      (some? params)
-                      (assoc :params params)))
-    (await-response! codex id method)))
+  (with-transport-lock
+    codex
+    (fn []
+      (let [id (next-id codex)]
+        (write-message! codex
+                        (cond-> {:id id
+                                 :method method}
+                          (some? params)
+                          (assoc :params params)))
+        (await-response! codex id method)))))
 
 (defn- notify!
   [codex method params]
-  (write-message! codex
-                  (cond-> {:method method}
-                    (some? params)
-                    (assoc :params params))))
+  (with-transport-lock
+    codex
+    (fn []
+      (write-message! codex
+                      (cond-> {:method method}
+                        (some? params)
+                        (assoc :params params))))))
 
 (defn- initialize!
   [codex {:keys [clientInfo capabilities]}]
@@ -175,35 +187,38 @@
 
 (defn turn-start
   [codex params]
-  (let [start-result (request! codex "turn/start" params)
-        turn-id (get-in start-result [:turn :id])]
-    (when-not turn-id
-      (throw (ex-info "[openai/codex] turn/start response missing turn id"
-                      {:result start-result})))
-    (loop [items []]
-      (let [message (read-message! codex)
-            method (:method message)]
-        (cond
-          (server-request? message)
-          (do
-            (handle-server-request! codex message)
-            (recur items))
+  (with-transport-lock
+    codex
+    (fn []
+      (let [start-result (request! codex "turn/start" params)
+            turn-id (get-in start-result [:turn :id])]
+        (when-not turn-id
+          (throw (ex-info "[openai/codex] turn/start response missing turn id"
+                          {:result start-result})))
+        (loop [items []]
+          (let [message (read-message! codex)
+                method (:method message)]
+            (cond
+              (server-request? message)
+              (do
+                (handle-server-request! codex message)
+                (recur items))
 
-          (response? message)
-          (throw (ex-info "[openai/codex] unexpected response while waiting for turn/completed"
-                          {:response message}))
+              (response? message)
+              (throw (ex-info "[openai/codex] unexpected response while waiting for turn/completed"
+                              {:response message}))
 
-          (= "item/completed" method)
-          (let [notification-params (:params message)]
-            (if (= turn-id (:turnId notification-params))
-              (recur (conj items (:item notification-params)))
-              (recur items)))
+              (= "item/completed" method)
+              (let [notification-params (:params message)]
+                (if (= turn-id (:turnId notification-params))
+                  (recur (conj items (:item notification-params)))
+                  (recur items)))
 
-          (= "turn/completed" method)
-          (let [completed-turn (get-in message [:params :turn])]
-            (if (= turn-id (:id completed-turn))
-              {:turn (assoc completed-turn :items items)}
-              (recur items)))
+              (= "turn/completed" method)
+              (let [completed-turn (get-in message [:params :turn])]
+                (if (= turn-id (:id completed-turn))
+                  {:turn (assoc completed-turn :items items)}
+                  (recur items)))
 
-          :else
-          (recur items))))))
+              :else
+              (recur items))))))))

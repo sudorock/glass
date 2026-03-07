@@ -6,6 +6,7 @@
         cheshire/cheshire {:mvn/version "6.1.0"}
         clj-log4j2/clj-log4j2 {:mvn/version "0.4.0"}
         hato/hato {:mvn/version "1.0.0"}
+        io.qdrant/client {:mvn/version "1.17.0"}
         jarohen/chime {:mvn/version "0.3.3"}
         metosin/muuntaja {:mvn/version "0.6.11"}
         metosin/reitit-malli {:mvn/version "0.9.1"}
