@@ -1,12 +1,32 @@
 (ns glass.service.openai.codex
   (:require
    [clojure.java.io :as io]
-   [glass.json :as json])
+   [glass.json :as json]
+   [glass.log :as log])
   (:import
-   [java.io BufferedReader BufferedWriter]
+   [java.io BufferedReader BufferedWriter IOException]
    [java.lang ProcessBuilder]))
 
 (def ^:private method-not-found -32601)
+
+(def ^:private denied-review-decision "denied")
+
+(defn- default-server-request-handler
+  [{:keys [method]}]
+  (case method
+    "item/commandExecution/requestApproval"
+    {:result {:decision "decline"}}
+
+    "item/fileChange/requestApproval"
+    {:result {:decision "decline"}}
+
+    "applyPatchApproval"
+    {:result {:decision denied-review-decision}}
+
+    "execCommandApproval"
+    {:result {:decision denied-review-decision}}
+
+    nil))
 
 (defn- ensure-reader
   [reader]
@@ -21,36 +41,60 @@
     (BufferedWriter. writer)))
 
 (defn- client
-  [{:keys [process reader writer]}]
+  [{:keys [process reader writer stderr-reader stderr-drainer server-request-handler]}]
   {:process process
    :reader (ensure-reader reader)
    :writer (ensure-writer writer)
+   :stderr-reader (some-> stderr-reader ensure-reader)
+   :stderr-drainer stderr-drainer
    :id-counter (atom 0)
-   :transport-lock (Object.)})
+   :transport-lock (Object.)
+   :server-request-handler (or server-request-handler
+                               default-server-request-handler)})
 
 (defn- with-transport-lock
   [codex f]
   (locking (:transport-lock codex)
     (f)))
 
+(defn- drain-reader!
+  [reader on-line]
+  (future
+    (try
+      (doseq [line (line-seq reader)]
+        (on-line line))
+      (catch IOException _
+        nil))))
+
 (defn- start-process
   []
   (let [^Process process
         (.start (ProcessBuilder.
                  ^"[Ljava.lang.String;"
-                 (into-array String ["codex" "app-server" "--listen" "stdio://"])))]
+                 (into-array String ["codex" "app-server" "--listen" "stdio://"])))
+        stderr-reader (io/reader (.getErrorStream process))]
     {:process process
      :reader (io/reader (.getInputStream process))
-     :writer (io/writer (.getOutputStream process))}))
+     :writer (io/writer (.getOutputStream process))
+     :stderr-reader stderr-reader
+     :stderr-drainer (drain-reader! stderr-reader
+                                    (fn [line]
+                                      (log/warn {:service :openai/codex
+                                                 :stream :stderr
+                                                 :line line})))}))
 
 (defn close
-  [{:keys [process ^BufferedReader reader ^BufferedWriter writer]}]
+  [{:keys [process ^BufferedReader reader ^BufferedWriter writer ^BufferedReader stderr-reader stderr-drainer]}]
   (when writer
     (.close writer))
   (when reader
     (.close reader))
+  (when stderr-reader
+    (.close stderr-reader))
   (when process
     (.destroy process))
+  (when stderr-drainer
+    (future-cancel stderr-drainer))
   nil)
 
 (defn- next-id
@@ -93,20 +137,17 @@
        (or (contains? message :result)
            (contains? message :error))))
 
+(defn- unsupported-server-request
+  [method]
+  {:error {:code method-not-found
+           :message (str "Unsupported server request: " method)}})
+
 (defn- handle-server-request!
-  [codex {:keys [id method]}]
-  (case method
-    "item/commandExecution/requestApproval"
-    (write-message! codex {:id id
-                           :result {:decision "decline"}})
-
-    "item/fileChange/requestApproval"
-    (write-message! codex {:id id
-                           :result {:decision "decline"}})
-
-    (write-message! codex {:id id
-                           :error {:code method-not-found
-                                   :message (str "Unsupported server request: " method)}})))
+  [codex {:keys [id method] :as message}]
+  (write-message! codex
+                  (assoc (or ((:server-request-handler codex) message)
+                             (unsupported-server-request method))
+                         :id id)))
 
 (defn- await-response!
   [codex id method]
@@ -165,10 +206,11 @@
 
 (defn start
   ([] (start {}))
-  ([{:keys [clientInfo capabilities]
+  ([{:keys [clientInfo capabilities server-request-handler]
      :or {clientInfo {:name "glass"
                       :version "dev"}}}]
-   (let [codex (client (start-process))]
+   (let [codex (client (assoc (start-process)
+                              :server-request-handler server-request-handler))]
      (try
        (initialize! codex {:clientInfo clientInfo
                            :capabilities capabilities})

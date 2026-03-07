@@ -3,6 +3,56 @@
    [clojure.test :refer [deftest is testing]]
    [glass.service.openai.codex :as codex]))
 
+(deftest handle-server-request-allows-custom-methods
+  (testing "custom request handling is supplied by the caller rather than hardcoded in transport"
+    (let [written (atom nil)
+          client {:server-request-handler (fn [{:keys [method]}]
+                                            (when (= "item/tool/requestUserInput" method)
+                                              {:result {:answers {"q" {:text "yes"}}}}))}]
+      (with-redefs [glass.service.openai.codex/write-message!
+                    (fn [_ message]
+                      (reset! written message))]
+        (#'glass.service.openai.codex/handle-server-request!
+         client
+         {:id 7
+          :method "item/tool/requestUserInput"
+          :params {:questions []}})
+        (is (= {:id 7
+                :result {:answers {"q" {:text "yes"}}}}
+               @written))))))
+
+(deftest handle-server-request-defaults-approval-responses
+  (testing "newer approval methods get default deny responses"
+    (let [messages (atom [])]
+      (with-redefs [glass.service.openai.codex/write-message!
+                    (fn [_ message]
+                      (swap! messages conj message))]
+        (#'glass.service.openai.codex/handle-server-request!
+         {:server-request-handler #'glass.service.openai.codex/default-server-request-handler}
+         {:id 1
+          :method "execCommandApproval"})
+        (#'glass.service.openai.codex/handle-server-request!
+         {:server-request-handler #'glass.service.openai.codex/default-server-request-handler}
+         {:id 2
+          :method "applyPatchApproval"})
+        (is (= [{:id 1
+                 :result {:decision "denied"}}
+                {:id 2
+                 :result {:decision "denied"}}]
+               @messages))))))
+
+(deftest drain-reader-consumes-lines
+  (testing "stderr can be drained without touching the JSON transport"
+    (let [lines (atom [])
+          reader (java.io.BufferedReader.
+                  (java.io.StringReader. "first\nsecond\n"))
+          drainer (#'glass.service.openai.codex/drain-reader!
+                   reader
+                   (fn [line]
+                     (swap! lines conj line)))]
+      @drainer
+      (is (= ["first" "second"] @lines)))))
+
 (deftest thread-start-serializes-concurrent-callers
   (testing "a second request does not write until the first request completes"
     (let [client {:id-counter (atom 0)
