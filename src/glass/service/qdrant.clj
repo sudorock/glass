@@ -3,9 +3,9 @@
    [com.google.common.util.concurrent ListenableFuture]
    [io.qdrant.client PointIdFactory QdrantClient QdrantGrpcClient QdrantGrpcClient$Builder ValueFactory VectorsFactory WithPayloadSelectorFactory]
    [io.qdrant.client.grpc Collections$Distance Collections$PayloadSchemaType Collections$VectorParams Collections$VectorParams$Builder]
-   [io.qdrant.client.grpc Common$PointId]
+   [io.qdrant.client.grpc Common$Filter Common$PointId]
    [io.qdrant.client.grpc JsonWithInt$Value]
-   [io.qdrant.client.grpc Points$PointStruct Points$PointStruct$Builder Points$ScoredPoint Points$SearchPoints Points$SearchPoints$Builder]
+   [io.qdrant.client.grpc Points$PointStruct Points$PointStruct$Builder Points$RetrievedPoint Points$ScoredPoint Points$ScrollPoints Points$ScrollPoints$Builder Points$ScrollResponse Points$SearchPoints Points$SearchPoints$Builder]
    [java.time Duration]
    [java.util List]))
 
@@ -121,14 +121,23 @@
     (.getNum point-id)
     (.getUuid point-id)))
 
+(defn- payload->clj
+  [payload]
+  (into {}
+        (map (fn [[k v]]
+               [k (value->clj v)]))
+        payload))
+
 (defn- scored-point->clj
   [^Points$ScoredPoint point]
   {:id (point-id->clj (.getId point))
    :score (.getScore point)
-   :payload (into {}
-                  (map (fn [[k v]]
-                         [k (value->clj v)]))
-                  (.getPayloadMap point))})
+   :payload (payload->clj (.getPayloadMap point))})
+
+(defn- retrieved-point->clj
+  [^Points$RetrievedPoint point]
+  {:id (point-id->clj (.getId point))
+   :payload (payload->clj (.getPayloadMap point))})
 
 (defn ^QdrantClient init
   [{:keys [host port tls? api-key timeout-ms]}]
@@ -185,3 +194,16 @@
     (.setLimit builder (long limit))
     (mapv scored-point->clj
           (wait (.searchAsync client (.build builder))))))
+
+(defn scroll-points
+  [^QdrantClient client {:keys [collection-name filter limit]}]
+  (let [^Points$ScrollPoints$Builder builder (Points$ScrollPoints/newBuilder)]
+    (.setCollectionName builder ^String collection-name)
+    (.setWithPayload builder (WithPayloadSelectorFactory/enable true))
+    (.setLimit builder (int limit))
+    (when filter
+      (.setFilter builder ^Common$Filter filter))
+    (mapv retrieved-point->clj
+          (.getResultList
+           ^Points$ScrollResponse
+           (wait (.scrollAsync client (.build builder)))))))
