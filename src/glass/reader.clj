@@ -6,11 +6,11 @@
 (def reader aero/reader)
 (def read-config aero/read-config)
 
-(defmethod reader 'ig/ref
+(defmethod reader 'sys/ref
   [_opts _tag value]
   (ig/ref value))
 
-(defmethod reader 'ig/refset
+(defmethod reader 'sys/refset
   [_opts _tag value]
   (ig/refset value))
 
