@@ -16,7 +16,7 @@
 
 (defn- stream->string
   ([in]
-   (stream->string in (.name (Charset/defaultCharset))))
+   (stream->string in Charset/defaultCharset))
   ([in enc]
    (with-open [out (StringWriter.)]
      (io/copy in out :encoding enc)
