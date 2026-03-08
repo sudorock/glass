@@ -2,25 +2,28 @@
 
 A Clojure utils library
 
-## `glass.token`
+## `glass.python.token`
 
-`glass.token` uses a Python environment that already has `tiktoken` installed.
+`glass.python` uses a Python environment that already has `tiktoken` installed.
 
 For local development in this repo:
 
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
-export GLASS_PYTHON_EXECUTABLE="$PWD/.venv/bin/python"
 ```
 
-Use `glass.token` from a REPL:
+Use `glass.python.token` from a REPL:
 
 ```clojure
-(require '[glass.token :as token])
+(require '[glass.python :as py]
+         '[glass.python.token :as token])
 
-(token/count-text "hello world")
-(token/count-file "README.md")
+(def runtime (py/init "/path/to/python"))
+
+(token/count-text runtime "hello world")
+(token/count-file runtime "README.md")
+(py/runtime)
 ```
 
-For consumers of Glass, point `GLASS_PYTHON_EXECUTABLE` at any Python interpreter or virtualenv that has `tiktoken` installed before loading `glass.token`.
+For consumers of Glass, pass any Python interpreter or virtualenv executable path that already has `tiktoken` installed to `glass.python/init`.
