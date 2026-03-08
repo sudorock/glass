@@ -2,7 +2,9 @@
   (:require
    [glass.mcp.system.router :as router]
    [reitit.ring :as reitit-ring]
-   [ring.adapter.jetty :as jetty]))
+   [ring.adapter.jetty :as jetty])
+  (:import
+   [org.eclipse.jetty.server Server]))
 
 (defn start!
   [{:keys [port]
@@ -16,5 +18,5 @@
     :join? false}))
 
 (defn stop!
-  [jetty]
+  [^Server jetty]
   (.stop jetty))

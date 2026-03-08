@@ -21,7 +21,9 @@
 
 (defn connect
   [{:keys [host port]}]
-  (let [socket (Socket. host port)
+  (let [^String host host
+        port (int port)
+        socket (Socket. host port)
         in (io/input-stream (.getInputStream socket))
         out (io/output-stream (.getOutputStream socket))
         state (atom {})

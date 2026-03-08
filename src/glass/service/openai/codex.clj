@@ -83,17 +83,18 @@
 
 (defn close
   [{:keys [process ^BufferedReader reader ^BufferedWriter writer ^BufferedReader stderr-reader stderr-drainer]}]
-  (when writer
-    (.close writer))
-  (when reader
-    (.close reader))
-  (when stderr-reader
-    (.close stderr-reader))
-  (when process
-    (.destroy process))
-  (when stderr-drainer
-    (future-cancel stderr-drainer))
-  nil)
+  (let [^Process process process]
+    (when writer
+      (.close writer))
+    (when reader
+      (.close reader))
+    (when stderr-reader
+      (.close stderr-reader))
+    (when process
+      (.destroy process))
+    (when stderr-drainer
+      (future-cancel stderr-drainer))
+    nil))
 
 (defn- next-id
   [codex]
@@ -101,9 +102,10 @@
 
 (defn- write-message!
   [codex message]
-  (let [^BufferedWriter writer (:writer codex)]
-    (.write writer (json/stringify message))
-    (.write writer "\n")
+  (let [^BufferedWriter writer (:writer codex)
+        ^String payload (json/stringify message)]
+    (.write writer payload)
+    (.newLine writer)
     (.flush writer)))
 
 (defn- read-message!
