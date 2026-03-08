@@ -58,28 +58,38 @@
 (defn- drain-reader!
   [reader on-line]
   (future
-    (try
-      (doseq [line (line-seq reader)]
-        (on-line line))
-      (catch IOException _
-        nil))))
+   (try
+     (doseq [line (line-seq reader)]
+       (on-line line))
+     (catch IOException _
+       nil))))
+
+(defn- resolve-home-path
+  [home]
+  (when home
+    (let [path (.getAbsoluteFile (io/file home))]
+      (.mkdirs path)
+      (.getPath path))))
 
 (defn- start-process
-  []
-  (let [^Process process
-        (.start (ProcessBuilder.
+  [home]
+  (let [builder (ProcessBuilder.
                  ^"[Ljava.lang.String;"
-                 (into-array String ["codex" "app-server" "--listen" "stdio://"])))
-        stderr-reader (io/reader (.getErrorStream process))]
-    {:process process
-     :reader (io/reader (.getInputStream process))
-     :writer (io/writer (.getOutputStream process))
-     :stderr-reader stderr-reader
-     :stderr-drainer (drain-reader! stderr-reader
-                                    (fn [line]
-                                      (log/warn {:service :openai/codex
-                                                 :stream :stderr
-                                                 :line line})))}))
+                 (into-array String ["codex" "app-server" "--listen" "stdio://"]))
+        home-path (resolve-home-path home)]
+    (when home-path
+      (.put (.environment builder) "CODEX_HOME" home-path))
+    (let [^Process process (.start builder)
+          stderr-reader (io/reader (.getErrorStream process))]
+      {:process process
+       :reader (io/reader (.getInputStream process))
+       :writer (io/writer (.getOutputStream process))
+       :stderr-reader stderr-reader
+       :stderr-drainer (drain-reader! stderr-reader
+                                      (fn [line]
+                                        (log/warn {:service :openai/codex
+                                                   :stream :stderr
+                                                   :line line})))})))
 
 (defn close
   [{:keys [process ^BufferedReader reader ^BufferedWriter writer ^BufferedReader stderr-reader stderr-drainer]}]
@@ -147,7 +157,7 @@
   (write-message! codex
                   (assoc (or ((:server-request-handler codex) message)
                              (unsupported-server-request method))
-                         :id id)))
+                    :id id)))
 
 (defn- await-response!
   [codex id method]
@@ -174,25 +184,25 @@
 (defn- request!
   [codex method params]
   (with-transport-lock
-    codex
-    (fn []
-      (let [id (next-id codex)]
-        (write-message! codex
-                        (cond-> {:id id
-                                 :method method}
-                          (some? params)
-                          (assoc :params params)))
-        (await-response! codex id method)))))
+   codex
+   (fn []
+     (let [id (next-id codex)]
+       (write-message! codex
+                       (cond-> {:id id
+                                :method method}
+                         (some? params)
+                         (assoc :params params)))
+       (await-response! codex id method)))))
 
 (defn- notify!
   [codex method params]
   (with-transport-lock
-    codex
-    (fn []
-      (write-message! codex
-                      (cond-> {:method method}
-                        (some? params)
-                        (assoc :params params))))))
+   codex
+   (fn []
+     (write-message! codex
+                     (cond-> {:method method}
+                       (some? params)
+                       (assoc :params params))))))
 
 (defn- initialize!
   [codex {:keys [clientInfo capabilities]}]
@@ -205,12 +215,13 @@
   codex)
 
 (defn start
-  ([] (start {}))
-  ([{:keys [clientInfo capabilities server-request-handler]
+  ([]
+   (start {}))
+  ([{:keys [clientInfo capabilities home server-request-handler]
      :or {clientInfo {:name "glass"
                       :version "dev"}}}]
-   (let [codex (client (assoc (start-process)
-                              :server-request-handler server-request-handler))]
+   (let [codex (client (assoc (start-process home)
+                         :server-request-handler server-request-handler))]
      (try
        (initialize! codex {:clientInfo clientInfo
                            :capabilities capabilities})
@@ -230,37 +241,37 @@
 (defn turn-start
   [codex params]
   (with-transport-lock
-    codex
-    (fn []
-      (let [start-result (request! codex "turn/start" params)
-            turn-id (get-in start-result [:turn :id])]
-        (when-not turn-id
-          (throw (ex-info "[openai/codex] turn/start response missing turn id"
-                          {:result start-result})))
-        (loop [items []]
-          (let [message (read-message! codex)
-                method (:method message)]
-            (cond
-              (server-request? message)
-              (do
-                (handle-server-request! codex message)
-                (recur items))
+   codex
+   (fn []
+     (let [start-result (request! codex "turn/start" params)
+           turn-id (get-in start-result [:turn :id])]
+       (when-not turn-id
+         (throw (ex-info "[openai/codex] turn/start response missing turn id"
+                         {:result start-result})))
+       (loop [items []]
+         (let [message (read-message! codex)
+               method (:method message)]
+           (cond
+             (server-request? message)
+             (do
+               (handle-server-request! codex message)
+               (recur items))
 
-              (response? message)
-              (throw (ex-info "[openai/codex] unexpected response while waiting for turn/completed"
-                              {:response message}))
+             (response? message)
+             (throw (ex-info "[openai/codex] unexpected response while waiting for turn/completed"
+                             {:response message}))
 
-              (= "item/completed" method)
-              (let [notification-params (:params message)]
-                (if (= turn-id (:turnId notification-params))
-                  (recur (conj items (:item notification-params)))
-                  (recur items)))
+             (= "item/completed" method)
+             (let [notification-params (:params message)]
+               (if (= turn-id (:turnId notification-params))
+                 (recur (conj items (:item notification-params)))
+                 (recur items)))
 
-              (= "turn/completed" method)
-              (let [completed-turn (get-in message [:params :turn])]
-                (if (= turn-id (:id completed-turn))
-                  {:turn (assoc completed-turn :items items)}
-                  (recur items)))
+             (= "turn/completed" method)
+             (let [completed-turn (get-in message [:params :turn])]
+               (if (= turn-id (:id completed-turn))
+                 {:turn (assoc completed-turn :items items)}
+                 (recur items)))
 
-              :else
-              (recur items))))))))
+             :else
+             (recur items))))))))
