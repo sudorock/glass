@@ -12,7 +12,7 @@
 (defn init
   [path schema]
   (let [ds (doto (SQLiteDataSource.) (.setUrl (str "jdbc:sqlite:" path)))
-        storage (storage-sql/make ds {:dbtype :sqlite})
-        conn (d/create-conn schema {:storage storage})]
-    conn))
+        storage (storage-sql/make ds {:dbtype :sqlite})]
+    (or (d/restore-conn storage)
+        (d/create-conn schema {:storage storage}))))
 
