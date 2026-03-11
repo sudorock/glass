@@ -6,7 +6,9 @@
    [glass.mcp.state :as state])
   (:import
    [java.util UUID]
-   [java.util.concurrent BlockingQueue]))
+   [java.util.concurrent BlockingQueue TimeUnit]))
+
+(def ^:private heartbeat-interval-ms 15000)
 
 (defn- start-sse-stream
   [session-id conn-id]
@@ -104,11 +106,16 @@
          (let [queue (get-in @state/state [:sessions mcp-session-id :connections :default :queue])]
            (try
              (when queue
-               (loop [response (.take ^BlockingQueue queue)]
-                 (emit
-                  (merge {:event "message"}
-                         (update response :data json/stringify)))
-                 (recur (.take ^BlockingQueue queue))))
+               (loop []
+                 (if-let [response (.poll ^BlockingQueue queue heartbeat-interval-ms TimeUnit/MILLISECONDS)]
+                   (do
+                     (emit
+                      (merge {:event "message"}
+                             (update response :data json/stringify)))
+                     (recur))
+                   (do
+                     (emit {:comment "keepalive"})
+                     (recur)))))
              (finally
                (close))))))}
     {:status 400

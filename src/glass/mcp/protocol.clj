@@ -8,6 +8,13 @@
 (defmulti handle-response (fn [request] (:method request)))
 (defmulti handle-notification (fn [request] (:method request)))
 
+(defn- default-queue-conn
+  []
+  (let [queue (LinkedBlockingQueue.)]
+    {:emit #(.put queue %)
+     :close (fn [])
+     :queue queue}))
+
 (defn default-conn
   [state session-id]
   (get-in state [:sessions session-id :connections :default]))
@@ -55,16 +62,12 @@
 
 (defmethod handle-request "initialize" [{:keys [id state params] :as req}]
   (let [{:keys [protocolVersion capabilities clientInfo procolversion]} params
-        protocol-version (or protocolVersion procolversion)
-        queue (LinkedBlockingQueue. 1024)]
+        protocol-version (or protocolVersion procolversion)]
     (swap-sess! req
                 (fn [sess]
                   (-> sess
                       (update :connections
-                              assoc :default
-                              {:emit #(.put queue %)
-                               :close (fn [])
-                               :queue queue})
+                              assoc :default (default-queue-conn))
                       (assoc :protocolVersion protocol-version
                              :capabilities capabilities
                              :clientInfo clientInfo))))
