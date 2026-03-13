@@ -22,8 +22,14 @@ Use `glass.python.token` from a REPL:
 (def runtime (py/init "/path/to/python"))
 
 (token/count-text runtime "hello world")
+(token/count-text runtime
+                  "hello <|endoftext|>"
+                  {:allowed-special #{"<|endoftext|>"}})
 (token/count-file runtime "README.md")
 (py/runtime)
 ```
 
 For consumers of Glass, pass any Python interpreter or virtualenv executable path that already has `tiktoken` installed to `glass.python/init`.
+
+`count-text` and `count-file` also accept `:allowed-special` and `:disallowed-special`.
+These mirror `tiktoken`, including the special `"all"` value.
