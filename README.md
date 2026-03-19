@@ -2,6 +2,18 @@
 
 A Clojure utils library
 
+## Check outdated dependencies
+
+Glass includes an `:outdated` alias powered by `antq` for checking old library versions in `deps.edn`.
+
+Run:
+
+```bash
+clojure -M:outdated
+```
+
+This reports dependencies with newer available versions.
+
 ## `glass.python.token`
 
 `glass.python` uses a Python environment that already has `tiktoken` installed.
