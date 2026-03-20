@@ -1,47 +1,76 @@
 # glass
 
-A Clojure utils library
+Glass is my personal Clojure grab bag for building services, tooling, and integrations.
 
-## Check outdated dependencies
+It collects small namespaces I reuse across projects for common data work, runtime helpers, and external system adapters.
 
-Glass includes an `:outdated` alias powered by `antq` for checking old library versions in `deps.edn`.
+## Who It Is For
 
-Run:
+Glass is primarily for my own use.
+
+The repo is public, but it is not intended to provide a stable public API. Namespaces, behavior, and dependency choices may change or break at any time.
+
+## Installation
+
+Glass is currently consumed as a Git dependency.
+
+```clojure
+{:deps {io.github.sudorock/glass
+        {:git/url "https://github.com/sudorock/glass"
+         :git/sha "7d026fa429fddfda458e6b53fb93fab651ef03b8"}}}
+```
+
+Pin to the commit or tag you want to depend on.
+
+## Library Structure
+
+The code currently falls into three broad groups.
+
+### Core Utilities
+
+General-purpose namespaces for data and text shaping, JSON, keywords, timestamps, URLs, UUIDs, exception data, and fractional indexing.
+
+### Runtime Helpers
+
+Reusable helpers for HTTP, shell execution, templating, scheduling, logging, Python interop, and Integrant/Aero-based system setup.
+
+### Integrations
+
+Optional integrations for MCP servers, OpenAI, Qdrant, and Datascript with SQLite persistence.
+
+## Suggested Structure
+
+The current namespace layout follows a simple split:
+
+- Keep broadly reusable code in `glass.*`
+- Keep service adapters in `glass.service.*`
+- Keep database adapters in `glass.db.*`
+- Keep MCP-specific code in `glass.mcp.*`
+
+This is only a rough organizing principle, not a stability promise.
+
+## Development
+
+Glass uses `deps.edn`.
+
+Check outdated dependencies with:
 
 ```bash
 clojure -M:outdated
 ```
 
-This reports dependencies with newer available versions.
+Some namespaces depend on external runtimes or services.
 
-## `glass.python.token`
+- Python interop expects a Python executable with `tiktoken` installed
+- Integration namespaces may require service credentials or a running local service
 
-`glass.python` uses a Python environment that already has `tiktoken` installed.
-
-For local development in this repo:
+For local Python setup in this repo:
 
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ```
 
-Use `glass.python.token` from a REPL:
+## License
 
-```clojure
-(require '[glass.python :as py]
-         '[glass.python.token :as token])
-
-(def runtime (py/init "/path/to/python"))
-
-(token/count-text runtime "hello world")
-(token/count-text runtime
-                  "hello <|endoftext|>"
-                  {:allowed-special #{"<|endoftext|>"}})
-(token/count-file runtime "README.md")
-(py/runtime)
-```
-
-For consumers of Glass, pass any Python interpreter or virtualenv executable path that already has `tiktoken` installed to `glass.python/init`.
-
-`count-text` and `count-file` also accept `:allowed-special` and `:disallowed-special`.
-These mirror `tiktoken`, including the special `"all"` value.
+Glass is available under the MIT License. See [LICENSE](/Users/indy/dev/glass/LICENSE).
