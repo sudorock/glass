@@ -186,11 +186,13 @@
   true)
 
 (defn search-points
-  [^QdrantClient client {:keys [collection-name vector limit]}]
+  [^QdrantClient client {:keys [collection-name vector filter limit]}]
   (let [^Points$SearchPoints$Builder builder (Points$SearchPoints/newBuilder)]
     (.setCollectionName builder ^String collection-name)
     (.setWithPayload builder (WithPayloadSelectorFactory/enable true))
     (.addAllVector builder ^Iterable (->float-vector vector))
+    (when filter
+      (.setFilter builder ^Common$Filter filter))
     (.setLimit builder (long limit))
     (mapv scored-point->clj
           (wait (.searchAsync client (.build builder))))))
