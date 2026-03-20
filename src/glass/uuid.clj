@@ -14,7 +14,7 @@
 (def ^:private rand-b-mask
   0x3fffffffffffffff)
 
-(defn random-uuid-str
+(defn uuid4
   []
   (str (UUID/randomUUID)))
 
