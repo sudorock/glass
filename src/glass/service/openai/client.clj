@@ -8,3 +8,7 @@
   (-> (OpenAIOkHttpClient/builder)
       (.apiKey api-key)
       (.build)))
+
+(defn close
+  [^OpenAIClient client]
+  (.close client))
