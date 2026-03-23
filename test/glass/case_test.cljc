@@ -10,24 +10,24 @@
 
 (deftest camel-test
   (testing "transforms scalar values"
-    (is (= "myValue" (case/camel :string "my-value")))
-    (is (= :myValue (case/camel :keyword :my-value))))
+    (is (= "myValue" (case/camel "my-value" :string)))
+    (is (= :myValue (case/camel :my-value :keyword))))
   (testing "transforms map keys"
     (is (= {:firstName "Ada" :lastName "Lovelace"}
-           (case/camel :keyword {:first-name "Ada" :last-name "Lovelace"})))))
+           (case/camel {:first-name "Ada" :last-name "Lovelace"} :keyword)))))
 
 (deftest kebab-test
   (testing "transforms scalar values"
-    (is (= "my-value" (case/kebab :string "myValue")))
-    (is (= :my-value (case/kebab :keyword :myValue))))
+    (is (= "my-value" (case/kebab "myValue" :string)))
+    (is (= :my-value (case/kebab :myValue :keyword))))
   (testing "transforms map keys"
     (is (= {:first-name "Ada" :last-name "Lovelace"}
-           (case/kebab :keyword {:firstName "Ada" :lastName "Lovelace"})))))
+           (case/kebab {:firstName "Ada" :lastName "Lovelace"} :keyword)))))
 
 (deftest snake-test
   (testing "transforms scalar values"
-    (is (= "my_value" (case/snake :string "myValue")))
-    (is (= :my_value (case/snake :keyword :myValue))))
+    (is (= "my_value" (case/snake "myValue" :string)))
+    (is (= :my_value (case/snake :myValue :keyword))))
   (testing "transforms map keys"
     (is (= {:first_name "Ada" :last_name "Lovelace"}
-           (case/snake :keyword {:firstName "Ada" :lastName "Lovelace"})))))
+           (case/snake {:firstName "Ada" :lastName "Lovelace"} :keyword)))))

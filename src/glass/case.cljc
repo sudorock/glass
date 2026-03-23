@@ -6,7 +6,7 @@
 
 (defn camel
   ;; TODO: Maybe use protocols? This is very bad, remove or refactor
-  [target x]
+  [x target]
   (let [transformer (case target
                       :keyword csk/->camelCaseKeyword
                       :string csk/->camelCaseString
@@ -16,7 +16,7 @@
 
 (defn kebab
   ;; TODO: Maybe use protocols?
-  [target x]
+  [x target]
   (let [transformer (case target
                       :keyword csk/->kebab-case-keyword
                       :string csk/->kebab-case-string
@@ -28,7 +28,7 @@
 
 (defn snake
   ;; TODO: Maybe use protocols?
-  [target x]
+  [x target]
   (let [transformer (case target
                       :keyword csk/->snake_case_keyword
                       :string csk/->snake_case_string
