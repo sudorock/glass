@@ -1,8 +1,6 @@
 (ns glass.system
   (:refer-clojure :exclude [ref])
   (:require
-   [clojure.java.io :as io]
-   [glass.reader :as reader]
    [integrant.core :as ig]))
 
 (def init ig/init)
@@ -20,9 +18,3 @@
 (def refset ig/refset)
 
 (defmethod init-key :default [_ x] x)
-
-(defn init-from-resource
-  [conf-path profile]
-  (-> (io/resource conf-path)
-      (reader/read-config {:profile profile})
-      init))
