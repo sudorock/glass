@@ -4,6 +4,7 @@
    [integrant.core :as ig]))
 
 (def init ig/init)
+(def bind ig/bind)
 (def halt! ig/halt!)
 (def resume ig/resume)
 (def suspend! ig/suspend!)
@@ -15,6 +16,7 @@
 
 (def load-namespaces ig/load-namespaces)
 (def ref ig/ref)
+(def var ig/var)
 (def refset ig/refset)
 
 (defmethod init-key :default [_ x] x)

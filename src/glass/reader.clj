@@ -46,6 +46,10 @@
   [_opts _tag value]
   (ig/ref value))
 
+(defmethod reader 'sys/var
+  [_opts _tag value]
+  (ig/var value))
+
 (defmethod reader 'sys/refset
   [_opts _tag value]
   (ig/refset value))
