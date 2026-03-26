@@ -1,0 +1,4 @@
+interface:
+  display_name: "Publish Glass"
+  short_description: "Publish glass and sync the README SHA"
+  default_prompt: "Use $publish-glass to publish this repo and update the README install SHA."

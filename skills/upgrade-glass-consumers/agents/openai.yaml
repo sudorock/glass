@@ -1,0 +1,4 @@
+interface:
+  display_name: "Upgrade Glass Consumers"
+  short_description: "Update local repos that depend on glass"
+  default_prompt: "Use $upgrade-glass-consumers to retarget local consumers to a published glass SHA."
