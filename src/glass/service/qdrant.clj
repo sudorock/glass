@@ -140,9 +140,9 @@
    :payload (payload->clj (.getPayloadMap point))})
 
 (defn ^QdrantClient init
-  [{:keys [host port tls? api-key timeout-ms]}]
+  [{:keys [host port tls api-key timeout-ms]}]
   (let [^QdrantGrpcClient$Builder builder
-        (cond-> (QdrantGrpcClient/newBuilder ^String host (int port) (boolean tls?))
+        (cond-> (QdrantGrpcClient/newBuilder ^String host (int port) (boolean tls))
           api-key
           (.withApiKey api-key)
 
