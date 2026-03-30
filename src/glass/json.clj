@@ -9,8 +9,10 @@
     false))
 
 (defn stringify
-  [x]
-  (json/generate-string x))
+  ([x]
+   (json/generate-string x))
+  ([x {:keys [key-fn]}]
+   (json/generate-string x {:key-fn key-fn})))
 
 (defn parse
   ([s] (json/parse-string s true))
