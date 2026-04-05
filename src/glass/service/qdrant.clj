@@ -1,13 +1,15 @@
 (ns glass.service.qdrant
   (:import
    [com.google.common.util.concurrent ListenableFuture]
+   [io.grpc ManagedChannel ManagedChannelBuilder]
    [io.qdrant.client PointIdFactory QdrantClient QdrantGrpcClient QdrantGrpcClient$Builder ValueFactory VectorsFactory WithPayloadSelectorFactory]
    [io.qdrant.client.grpc Collections$Distance Collections$PayloadSchemaType Collections$VectorParams Collections$VectorParams$Builder]
    [io.qdrant.client.grpc Common$Filter Common$PointId]
    [io.qdrant.client.grpc JsonWithInt$Value]
    [io.qdrant.client.grpc Points$PointStruct Points$PointStruct$Builder Points$RetrievedPoint Points$ScoredPoint Points$ScrollPoints Points$ScrollPoints$Builder Points$ScrollResponse Points$SearchPoints Points$SearchPoints$Builder]
    [java.time Duration]
-   [java.util List]))
+   [java.util List]
+   [java.util.concurrent TimeUnit]))
 
 (set! *warn-on-reflection* true)
 
@@ -141,8 +143,17 @@
 
 (defn ^QdrantClient init
   [{:keys [host port tls api-key timeout-ms]}]
-  (let [^QdrantGrpcClient$Builder builder
-        (cond-> (QdrantGrpcClient/newBuilder ^String host (int port) (boolean tls))
+  (let [^ManagedChannel channel
+        (-> (ManagedChannelBuilder/forAddress ^String host (int port))
+            (cond->
+              (not tls) (.usePlaintext)
+              tls (.useTransportSecurity))
+            (.keepAliveTime 60 TimeUnit/SECONDS)
+            (.keepAliveTimeout 20 TimeUnit/SECONDS)
+            (.keepAliveWithoutCalls true)
+            (.build))
+        ^QdrantGrpcClient$Builder builder
+        (cond-> (QdrantGrpcClient/newBuilder channel true)
           api-key
           (.withApiKey api-key)
 
