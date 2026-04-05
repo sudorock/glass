@@ -15,9 +15,8 @@ The repo is public, but it is not intended to provide a stable public API. Names
 Glass is currently consumed as a Git dependency.
 
 ```clojure
-{:deps
- {sudorock/glass {:git/url "https://github.com/sudorock/glass"
-                  :git/sha "560451c9883c0f9413ad00b418097948cedc91d3"}}}
+sudorock/glass {:git/url "https://github.com/sudorock/glass"
+                :git/sha "73c8df6d9126396195b1d786bd9ce1fc2aa36de8"}
 ```
 
 Pin to the commit or tag you want to depend on.
