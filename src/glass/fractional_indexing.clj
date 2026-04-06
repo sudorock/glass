@@ -1,9 +1,23 @@
 (ns glass.fractional-indexing
   (:require
-   [clojure.string :as str]))
+   [clojure.string :as str])
+  (:import
+   [clojure.lang ExceptionInfo]))
 
 (def ^:private base-62-digits
   "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
+
+(defn- invalid-order-key!
+  [key]
+  (throw (ex-info (str "invalid order key: " key) {:key key})))
+
+(defn- invalid-integer!
+  [int-part]
+  (throw (ex-info (str "invalid integer part of order key: " int-part) {:int int-part})))
+
+(defn- valid-digit?
+  [digits ch]
+  (some? (str/index-of digits ch)))
 
 (defn- midpoint
   "Find lexicographic midpoint between fractional parts a and b.
@@ -48,35 +62,53 @@
       (<= (int \A) c (int \Z)) (+ (- (int \Z) c) 2)
       :else (throw (ex-info (str "invalid order key head: " head) {:head head})))))
 
-(defn- validate-integer
+(defn- validate-integer!
   "Validate variable-length integer format."
-  [int-part]
+  [int-part digits]
   (when (not= (count int-part) (integer-length (first int-part)))
-    (throw (ex-info (str "invalid integer part of order key: " int-part) {:int int-part}))))
+    (invalid-integer! int-part))
+  (when (not-every? #(valid-digit? digits %) (rest int-part))
+    (invalid-integer! int-part)))
 
 (defn- integer-part
   "Extract integer part from order key."
-  [key]
+  [key digits]
+  (when (empty? key)
+    (invalid-order-key! key))
   (let [len (integer-length (first key))]
     (when (> len (count key))
-      (throw (ex-info (str "invalid order key: " key) {:key key})))
-    (subs key 0 len)))
+      (invalid-order-key! key))
+    (let [int-part (subs key 0 len)]
+      (validate-integer! int-part digits)
+      int-part)))
 
-(defn- validate-order-key
+(defn- validate-order-key!
   "Validate complete order key format."
   [key digits]
   (let [zero (first digits)]
     (when (= key (str "A" (apply str (repeat 26 zero))))
-      (throw (ex-info (str "invalid order key: " key) {:key key})))
-    (let [i (integer-part key)
+      (invalid-order-key! key))
+    (let [i (integer-part key digits)
           f (subs key (count i))]
-      (when (= (last f) zero)
-        (throw (ex-info (str "invalid order key: " key) {:key key}))))))
+      (when (not-every? #(valid-digit? digits %) f)
+        (invalid-order-key! key))
+      (when (and (seq f) (= (last f) zero))
+        (invalid-order-key! key)))))
+
+(defn valid-fractional-index?
+  "Return true when key is a valid fractional index."
+  ([key] (valid-fractional-index? key base-62-digits))
+  ([key digits]
+   (try
+     (validate-order-key! key digits)
+     true
+     (catch ExceptionInfo _e
+       false))))
 
 (defn- increment-integer
   "Increment variable-length integer. Returns nil if max reached."
   [x digits]
-  (validate-integer x)
+  (validate-integer! x digits)
   (let [[head & digs-seq] x
         digs (vec digs-seq)
         zero (first digits)
@@ -102,7 +134,7 @@
 (defn- decrement-integer
   "Decrement variable-length integer. Returns nil if min reached."
   [x digits]
-  (validate-integer x)
+  (validate-integer! x digits)
   (let [[head & digs-seq] x
         digs (vec digs-seq)
         zero (first digits)
@@ -131,8 +163,8 @@
   digits is string of characters in ascending order (default base-62)."
   ([a b] (generate-key-between a b base-62-digits))
   ([a b digits]
-   (when a (validate-order-key a digits))
-   (when b (validate-order-key b digits))
+   (when a (validate-order-key! a digits))
+   (when b (validate-order-key! b digits))
    (when (and a b (>= (compare a b) 0))
      (throw (ex-info (str a " >= " b) {:a a :b b})))
 
@@ -141,7 +173,7 @@
        (nil? a)
        (if (nil? b)
          (str "a" zero)
-         (let [ib (integer-part b)
+         (let [ib (integer-part b digits)
                fb (subs b (count ib))
                smallest-int (str "A" (apply str (repeat 26 zero)))]
            (cond
@@ -151,15 +183,15 @@
                        (throw (ex-info "cannot decrement any more" {:ib ib}))))))
 
        (nil? b)
-       (let [ia (integer-part a)
+       (let [ia (integer-part a digits)
              fa (subs a (count ia))
              i (increment-integer ia digits)]
          (if i i (str ia (midpoint fa nil digits))))
 
        :else
-       (let [ia (integer-part a)
+       (let [ia (integer-part a digits)
              fa (subs a (count ia))
-             ib (integer-part b)
+             ib (integer-part b digits)
              fb (subs b (count ib))]
          (if (= ia ib)
            (str ia (midpoint fa fb digits))

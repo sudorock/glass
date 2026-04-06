@@ -2,7 +2,74 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [glass.fractional-indexing :refer [generate-key-between
-                                      generate-n-keys-between]]))
+                                      generate-n-keys-between
+                                      valid-fractional-index?]]))
+
+(deftest valid-fractional-index?-test
+  (let [base-62-digits "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+        base-95-digits " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"]
+    (testing "valid keys without fractional part"
+      (is (true? (valid-fractional-index? "a0")))
+      (is (true? (valid-fractional-index? "a1")))
+      (is (true? (valid-fractional-index? "Zz")))
+      (is (true? (valid-fractional-index? "Y00")))
+      (is (true? (valid-fractional-index? "b00")))
+      (is (true? (valid-fractional-index? "A000000000000000000000000001"))))
+
+    (testing "valid keys with fractional parts"
+      (is (true? (valid-fractional-index? "a0V")))
+      (is (true? (valid-fractional-index? "a01")))
+      (is (true? (valid-fractional-index? "a0lV")))
+      (is (true? (valid-fractional-index? "a0001")))
+      (is (true? (valid-fractional-index? "zzzzzzzzzzzzzzzzzzzzzzzzzzzV"))))
+
+    (testing "valid keys with explicit base-62 digits"
+      (is (true? (valid-fractional-index? "a0V" base-62-digits))))
+
+    (testing "valid keys with base-95 digits"
+      (is (true? (valid-fractional-index? "a " base-95-digits)))
+      (is (true? (valid-fractional-index? "a0;" base-95-digits))))
+
+    (testing "nil input"
+      (is (false? (valid-fractional-index? nil))))
+
+    (testing "empty string"
+      (is (false? (valid-fractional-index? ""))))
+
+    (testing "invalid fractional character"
+      (is (false? (valid-fractional-index? "a0?"))))
+
+    (testing "invalid head character"
+      (is (false? (valid-fractional-index? "000")))
+      (is (false? (valid-fractional-index? "1"))))
+
+    (testing "too-short integer part"
+      (is (false? (valid-fractional-index? "b")))
+      (is (false? (valid-fractional-index? "b1"))))
+
+    (testing "trailing zero in fractional part"
+      (is (false? (valid-fractional-index? "a00")))
+      (is (false? (valid-fractional-index? "a0V0"))))
+
+    (testing "smallest key rejection"
+      (is (false? (valid-fractional-index? "A00000000000000000000000000")))
+      (is (false? (valid-fractional-index? "A                          " base-95-digits))))
+
+    (testing "invalid digit in integer part"
+      (is (false? (valid-fractional-index? "a?")))
+      (is (false? (valid-fractional-index? "b0?0V"))))
+
+    (testing "generated keys are valid"
+      (let [k1 (generate-key-between nil nil)
+            k2 (generate-key-between k1 nil)
+            k3 (generate-key-between nil k1)
+            k4 (generate-key-between k1 k2)
+            k5 (generate-key-between "zzzzzzzzzzzzzzzzzzzzzzzzzzz" nil)]
+        (is (true? (valid-fractional-index? k1)))
+        (is (true? (valid-fractional-index? k2)))
+        (is (true? (valid-fractional-index? k3)))
+        (is (true? (valid-fractional-index? k4)))
+        (is (true? (valid-fractional-index? k5)))))))
 
 (deftest generate-key-between-test
   (testing "basic operations"
@@ -41,6 +108,8 @@
                           (generate-key-between "a00" nil)))
     (is (thrown-with-msg? Exception #"invalid order key: a00"
                           (generate-key-between "a00" "a1")))
+    (is (thrown-with-msg? Exception #"invalid order key: a0\?"
+                          (generate-key-between "a0?" nil)))
     (is (thrown-with-msg? Exception #"invalid order key head: 0"
                           (generate-key-between "0" "1")))
     (is (thrown-with-msg? Exception #"a1 >= a0"
