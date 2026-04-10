@@ -1,15 +1,15 @@
 (ns glass.service.qdrant
   (:import
    [com.google.common.util.concurrent ListenableFuture]
-   [io.grpc ManagedChannel ManagedChannelBuilder]
-   [io.qdrant.client PointIdFactory QdrantClient QdrantGrpcClient QdrantGrpcClient$Builder ValueFactory VectorsFactory WithPayloadSelectorFactory]
-   [io.qdrant.client.grpc Collections$Distance Collections$PayloadSchemaType Collections$VectorParams Collections$VectorParams$Builder]
-   [io.qdrant.client.grpc Common$Filter Common$PointId]
-   [io.qdrant.client.grpc JsonWithInt$Value]
-   [io.qdrant.client.grpc Points$PointStruct Points$PointStruct$Builder Points$RetrievedPoint Points$ScoredPoint Points$ScrollPoints Points$ScrollPoints$Builder Points$ScrollResponse Points$SearchPoints Points$SearchPoints$Builder]
-   [java.time Duration]
-   [java.util List]
-   [java.util.concurrent TimeUnit]))
+  [io.grpc ManagedChannel ManagedChannelBuilder]
+  [io.qdrant.client PointIdFactory QdrantClient QdrantGrpcClient QdrantGrpcClient$Builder ValueFactory VectorsFactory WithPayloadSelectorFactory]
+  [io.qdrant.client.grpc Collections$Distance Collections$PayloadSchemaType Collections$VectorParams Collections$VectorParams$Builder]
+  [io.qdrant.client.grpc Common$Filter Common$PointId]
+  [io.qdrant.client.grpc JsonWithInt$Value]
+  [io.qdrant.client.grpc Points$PointStruct Points$PointStruct$Builder Points$PointsIdsList Points$PointsIdsList$Builder Points$PointsSelector Points$PointsSelector$Builder Points$RetrievedPoint Points$ScoredPoint Points$ScrollPoints Points$ScrollPoints$Builder Points$ScrollResponse Points$SearchPoints Points$SearchPoints$Builder Points$SetPayloadPoints Points$SetPayloadPoints$Builder]
+  [java.time Duration]
+  [java.util List]
+  [java.util.concurrent TimeUnit]))
 
 (set! *warn-on-reflection* true)
 
@@ -195,6 +195,19 @@
   [^QdrantClient client {:keys [collection-name points]}]
   (wait (.upsertAsync client ^String collection-name ^List (mapv ->point points)))
   true)
+
+(defn set-payload
+  [^QdrantClient client {:keys [collection-name payload point-ids]}]
+  (let [^Points$SetPayloadPoints$Builder builder (Points$SetPayloadPoints/newBuilder)
+        ^Points$PointsSelector$Builder points-selector-builder (Points$PointsSelector/newBuilder)
+        ^Points$PointsIdsList$Builder points-ids-list-builder (Points$PointsIdsList/newBuilder)]
+    (.setCollectionName builder ^String collection-name)
+    (.putAllPayload builder (->payload payload))
+    (.addAllIds points-ids-list-builder ^Iterable (mapv ->point-id point-ids))
+    (.setPoints points-selector-builder (.build points-ids-list-builder))
+    (.setPointsSelector builder (.build points-selector-builder))
+    (wait (.setPayloadAsync client (.build builder) nil))
+    true))
 
 (defn search-points
   [^QdrantClient client {:keys [collection-name vector filter limit]}]
