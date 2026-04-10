@@ -1,15 +1,15 @@
 (ns glass.service.qdrant
   (:import
    [com.google.common.util.concurrent ListenableFuture]
-  [io.grpc ManagedChannel ManagedChannelBuilder]
-  [io.qdrant.client PointIdFactory QdrantClient QdrantGrpcClient QdrantGrpcClient$Builder ValueFactory VectorsFactory WithPayloadSelectorFactory]
-  [io.qdrant.client.grpc Collections$Distance Collections$PayloadSchemaType Collections$VectorParams Collections$VectorParams$Builder]
-  [io.qdrant.client.grpc Common$Filter Common$PointId]
-  [io.qdrant.client.grpc JsonWithInt$Value]
-  [io.qdrant.client.grpc Points$PointStruct Points$PointStruct$Builder Points$PointsIdsList Points$PointsIdsList$Builder Points$PointsSelector Points$PointsSelector$Builder Points$RetrievedPoint Points$ScoredPoint Points$ScrollPoints Points$ScrollPoints$Builder Points$ScrollResponse Points$SearchPoints Points$SearchPoints$Builder Points$SetPayloadPoints Points$SetPayloadPoints$Builder]
-  [java.time Duration]
-  [java.util List]
-  [java.util.concurrent TimeUnit]))
+   [io.grpc ManagedChannel ManagedChannelBuilder]
+   [io.qdrant.client PointIdFactory QdrantClient QdrantGrpcClient QdrantGrpcClient$Builder ValueFactory VectorsFactory WithPayloadSelectorFactory]
+   [io.qdrant.client.grpc Collections$Distance Collections$PayloadSchemaType Collections$VectorParams Collections$VectorParams$Builder]
+   [io.qdrant.client.grpc Common$Filter Common$PointId]
+   [io.qdrant.client.grpc JsonWithInt$Value]
+   [io.qdrant.client.grpc Points$PointStruct Points$PointStruct$Builder Points$PointsIdsList Points$PointsIdsList$Builder Points$PointsSelector Points$PointsSelector$Builder Points$RetrievedPoint Points$ScoredPoint Points$ScrollPoints Points$ScrollPoints$Builder Points$ScrollResponse Points$SearchPoints Points$SearchPoints$Builder Points$SetPayloadPoints Points$SetPayloadPoints$Builder]
+   [java.time Duration]
+   [java.util List]
+   [java.util.concurrent TimeUnit]))
 
 (set! *warn-on-reflection* true)
 
