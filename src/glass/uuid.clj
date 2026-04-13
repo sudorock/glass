@@ -16,7 +16,7 @@
 
 (defn uuid4
   []
-  (str (UUID/randomUUID)))
+  (UUID/randomUUID))
 
 (defn uuid7
   []
@@ -28,4 +28,4 @@
                                       rand-a)
         least-significant-bits (bit-or (bit-shift-left 0x2 62)
                                        rand-b)]
-    (str (UUID. most-significant-bits least-significant-bits))))
+    (UUID. most-significant-bits least-significant-bits)))
