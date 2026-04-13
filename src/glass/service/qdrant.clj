@@ -8,7 +8,7 @@
    [io.qdrant.client.grpc JsonWithInt$Value]
    [io.qdrant.client.grpc Points$PointStruct Points$PointStruct$Builder Points$PointsIdsList Points$PointsIdsList$Builder Points$PointsSelector Points$PointsSelector$Builder Points$RetrievedPoint Points$ScoredPoint Points$ScrollPoints Points$ScrollPoints$Builder Points$ScrollResponse Points$SearchPoints Points$SearchPoints$Builder Points$SetPayloadPoints Points$SetPayloadPoints$Builder]
    [java.time Duration]
-   [java.util List]
+   [java.util List Map]
    [java.util.concurrent TimeUnit]))
 
 (set! *warn-on-reflection* true)
@@ -78,7 +78,10 @@
     (ValueFactory/value ^List (mapv ->value x))
 
     (map? x)
-    (ValueFactory/value ^java.util.Map (->payload x))
+    (ValueFactory/value ^Map (->payload x))
+
+    (uuid? x)
+    (ValueFactory/value (str x))
 
     :else
     (throw (ex-info "Unsupported Qdrant payload value"
