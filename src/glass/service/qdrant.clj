@@ -88,19 +88,32 @@
                     {:value x
                      :type (type x)}))))
 
-(defn- ->point-id
+(defn point-id
   ^Common$PointId
   [x]
-  (if (integer? x)
+  (cond
+    (integer? x)
     (PointIdFactory/id (long x))
+
+    (uuid? x)
     (.build
      (doto (Common$PointId/newBuilder)
-       (.setUuid (str x))))))
+       (.setUuid (str x))))
+
+    (string? x)
+    (.build
+     (doto (Common$PointId/newBuilder)
+       (.setUuid x)))
+
+    :else
+    (throw (ex-info "Unsupported Qdrant point ID"
+                    {:value x
+                     :type (type x)}))))
 
 (defn- ->point
   [{:keys [id vector payload]}]
   (let [^Points$PointStruct$Builder builder (Points$PointStruct/newBuilder)]
-    (.setId builder (->point-id id))
+    (.setId builder (point-id id))
     (.setVectors builder (VectorsFactory/vectors ^List (->float-vector vector)))
     (when (some? payload)
       (.putAllPayload builder (->payload payload)))
@@ -206,7 +219,7 @@
         ^Points$PointsIdsList$Builder points-ids-list-builder (Points$PointsIdsList/newBuilder)]
     (.setCollectionName builder ^String collection-name)
     (.putAllPayload builder (->payload payload))
-    (.addAllIds points-ids-list-builder ^Iterable (mapv ->point-id point-ids))
+    (.addAllIds points-ids-list-builder ^Iterable (mapv point-id point-ids))
     (.setPoints points-selector-builder (.build points-ids-list-builder))
     (.setPointsSelector builder (.build points-selector-builder))
     (wait (.setPayloadAsync client (.build builder) nil))
