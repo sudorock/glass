@@ -225,6 +225,7 @@
         ^Points$PointsSelector$Builder points-selector-builder (Points$PointsSelector/newBuilder)
         ^Points$PointsIdsList$Builder points-ids-list-builder (Points$PointsIdsList/newBuilder)]
     (.setCollectionName builder ^String collection-name)
+    (.setWait builder true)
     (.putAllPayload builder (->payload payload))
     (.addAllIds points-ids-list-builder ^Iterable (mapv point-id point-ids))
     (.setPoints points-selector-builder (.build points-ids-list-builder))
