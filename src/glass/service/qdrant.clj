@@ -212,6 +212,13 @@
   (wait (.upsertAsync client ^String collection-name ^List (mapv ->point points)))
   true)
 
+(defn delete-points
+  [^QdrantClient client {:keys [collection-name point-ids filter]}]
+  (if filter
+    (wait (.deleteAsync client ^String collection-name ^Common$Filter filter))
+    (wait (.deleteAsync client ^String collection-name ^List (mapv point-id point-ids))))
+  true)
+
 (defn set-payload
   [^QdrantClient client {:keys [collection-name payload point-ids]}]
   (let [^Points$SetPayloadPoints$Builder builder (Points$SetPayloadPoints/newBuilder)
