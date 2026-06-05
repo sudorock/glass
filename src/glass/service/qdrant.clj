@@ -2,11 +2,11 @@
   (:import
    [com.google.common.util.concurrent ListenableFuture]
    [io.grpc ManagedChannel ManagedChannelBuilder]
-   [io.qdrant.client PointIdFactory QdrantClient QdrantGrpcClient QdrantGrpcClient$Builder ValueFactory VectorsFactory WithPayloadSelectorFactory]
-   [io.qdrant.client.grpc Collections$Distance Collections$PayloadSchemaType Collections$VectorParams Collections$VectorParams$Builder]
+   [io.qdrant.client PointIdFactory QdrantClient QdrantGrpcClient QdrantGrpcClient$Builder QueryFactory ValueFactory VectorFactory VectorsFactory WithPayloadSelectorFactory]
+   [io.qdrant.client.grpc Collections$CreateCollection Collections$CreateCollection$Builder Collections$Distance Collections$Modifier Collections$PayloadSchemaType Collections$SparseVectorConfig Collections$SparseVectorConfig$Builder Collections$SparseVectorParams Collections$SparseVectorParams$Builder Collections$VectorParams Collections$VectorParams$Builder Collections$VectorParamsMap Collections$VectorParamsMap$Builder Collections$VectorsConfig Collections$VectorsConfig$Builder]
    [io.qdrant.client.grpc Common$Filter Common$PointId]
    [io.qdrant.client.grpc JsonWithInt$Value]
-   [io.qdrant.client.grpc Points$PointStruct Points$PointStruct$Builder Points$PointsIdsList Points$PointsIdsList$Builder Points$PointsSelector Points$PointsSelector$Builder Points$RetrievedPoint Points$ScoredPoint Points$ScrollPoints Points$ScrollPoints$Builder Points$ScrollResponse Points$SearchPoints Points$SearchPoints$Builder Points$SetPayloadPoints Points$SetPayloadPoints$Builder]
+   [io.qdrant.client.grpc Points$Document Points$Document$Builder Points$Fusion Points$PointStruct Points$PointStruct$Builder Points$PointsIdsList Points$PointsIdsList$Builder Points$PointsSelector Points$PointsSelector$Builder Points$PrefetchQuery Points$PrefetchQuery$Builder Points$Query Points$QueryPoints Points$QueryPoints$Builder Points$RetrievedPoint Points$Rrf Points$Rrf$Builder Points$ScoredPoint Points$ScrollPoints Points$ScrollPoints$Builder Points$ScrollResponse Points$SetPayloadPoints Points$SetPayloadPoints$Builder Points$Vector]
    [java.time Duration]
    [java.util List Map]
    [java.util.concurrent TimeUnit]))
@@ -36,6 +36,12 @@
     :text Collections$PayloadSchemaType/Text
     :datetime Collections$PayloadSchemaType/Datetime
     :uuid Collections$PayloadSchemaType/Uuid))
+
+(defn- modifier
+  [x]
+  (case x
+    :idf Collections$Modifier/Idf
+    :none Collections$Modifier/None))
 
 (defn- field-name
   [x]
@@ -110,11 +116,40 @@
                     {:value x
                      :type (type x)}))))
 
+(defn- ->document
+  ^Points$Document
+  [{:keys [text model options]}]
+  (let [^Points$Document$Builder builder (Points$Document/newBuilder)]
+    (.setText builder ^String text)
+    (.setModel builder ^String model)
+    (when (some? options)
+      (.putAllOptions builder (->payload options)))
+    (.build builder)))
+
+(defn- ->vector
+  ^Points$Vector
+  [v]
+  (cond
+    (sequential? v)
+    (VectorFactory/vector ^List (->float-vector v))
+
+    (map? v)
+    (VectorFactory/vector ^Points$Document (->document v))
+
+    :else
+    (throw (ex-info "Unsupported Qdrant vector"
+                    {:value v
+                     :type (type v)}))))
+
 (defn- ->point
-  [{:keys [id vector payload]}]
-  (let [^Points$PointStruct$Builder builder (Points$PointStruct/newBuilder)]
+  [{:keys [id vectors payload]}]
+  (let [^Points$PointStruct$Builder builder (Points$PointStruct/newBuilder)
+        named (into {}
+                    (map (fn [[k v]]
+                           [(field-name k) (->vector v)]))
+                    vectors)]
     (.setId builder (point-id id))
-    (.setVectors builder (VectorsFactory/vectors ^List (->float-vector vector)))
+    (.setVectors builder (VectorsFactory/namedVectors ^Map named))
     (when (some? payload)
       (.putAllPayload builder (->payload payload)))
     (.build builder)))
@@ -186,12 +221,36 @@
   [^QdrantClient client {:keys [collection-name]}]
   (boolean (wait (.collectionExistsAsync client collection-name))))
 
-(defn create-collection
-  [^QdrantClient client {:keys [collection-name vector-size] :as opts}]
+(defn- ->vector-params
+  ^Collections$VectorParams
+  [{:keys [size] :as opts}]
   (let [^Collections$VectorParams$Builder builder (Collections$VectorParams/newBuilder)]
+    (.setSize builder (long size))
     (.setDistance builder (distance (:distance opts)))
-    (.setSize builder (long vector-size))
-    (wait (.createCollectionAsync client ^String collection-name (.build builder))))
+    (.build builder)))
+
+(defn- ->sparse-vector-params
+  ^Collections$SparseVectorParams
+  [opts]
+  (let [^Collections$SparseVectorParams$Builder builder (Collections$SparseVectorParams/newBuilder)]
+    (.setModifier builder (modifier (:modifier opts)))
+    (.build builder)))
+
+(defn create-collection
+  [^QdrantClient client {:keys [collection-name vectors sparse-vectors]}]
+  (let [^Collections$VectorParamsMap$Builder vpm (Collections$VectorParamsMap/newBuilder)
+        ^Collections$VectorsConfig$Builder vc (Collections$VectorsConfig/newBuilder)
+        ^Collections$SparseVectorConfig$Builder svc (Collections$SparseVectorConfig/newBuilder)
+        ^Collections$CreateCollection$Builder builder (Collections$CreateCollection/newBuilder)]
+    (doseq [[k params] vectors]
+      (.putMap vpm (field-name k) (->vector-params params)))
+    (.setParamsMap vc (.build vpm))
+    (doseq [[k params] sparse-vectors]
+      (.putMap svc (field-name k) (->sparse-vector-params params)))
+    (.setCollectionName builder ^String collection-name)
+    (.setVectorsConfig builder (.build vc))
+    (.setSparseVectorsConfig builder (.build svc))
+    (wait (.createCollectionAsync client ^Collections$CreateCollection (.build builder))))
   true)
 
 (defn create-payload-index
@@ -233,17 +292,67 @@
     (wait (.setPayloadAsync client (.build builder) nil))
     true))
 
-(defn search-points
-  [^QdrantClient client {:keys [collection-name vector filter limit]}]
-  (let [^Points$SearchPoints$Builder builder (Points$SearchPoints/newBuilder)]
-    (.setCollectionName builder ^String collection-name)
-    (.setWithPayload builder (WithPayloadSelectorFactory/enable true))
-    (.addAllVector builder ^Iterable (->float-vector vector))
+(defn- ->query
+  ^Points$Query
+  [q]
+  (cond
+    (sequential? q)
+    (QueryFactory/nearest ^List (->float-vector q))
+
+    (map? q)
+    (QueryFactory/nearest ^Points$Document (->document q))
+
+    :else
+    (throw (ex-info "Unsupported Qdrant query"
+                    {:value q
+                     :type (type q)}))))
+
+(defn- ->prefetch
+  ^Points$PrefetchQuery
+  [{:keys [using query filter limit]}]
+  (let [^Points$PrefetchQuery$Builder builder (Points$PrefetchQuery/newBuilder)]
+    (.setUsing builder ^String using)
+    (.setQuery builder (->query query))
     (when filter
       (.setFilter builder ^Common$Filter filter))
     (.setLimit builder (long limit))
+    (.build builder)))
+
+(defn- ->fusion-query
+  ^Points$Query
+  [fusion]
+  (cond
+    (= fusion :rrf)
+    (QueryFactory/fusion Points$Fusion/RRF)
+
+    (= fusion :dbsf)
+    (QueryFactory/fusion Points$Fusion/DBSF)
+
+    (and (map? fusion) (contains? fusion :rrf))
+    (let [{:keys [k weights]} (:rrf fusion)
+          ^Points$Rrf$Builder builder (Points$Rrf/newBuilder)]
+      (when (some? k)
+        (.setK builder (int k)))
+      (when (seq weights)
+        (.addAllWeights builder ^Iterable (mapv float weights)))
+      (QueryFactory/rrf (.build builder)))
+
+    :else
+    (throw (ex-info "Unsupported Qdrant fusion"
+                    {:value fusion
+                     :type (type fusion)}))))
+
+(defn query-points
+  [^QdrantClient client {:keys [collection-name prefetch fusion limit]}]
+  (let [^Points$QueryPoints$Builder builder (Points$QueryPoints/newBuilder)]
+    (.setCollectionName builder ^String collection-name)
+    (doseq [p prefetch]
+      (.addPrefetch builder (->prefetch p)))
+    (.setQuery builder (->fusion-query fusion))
+    (.setLimit builder (long limit))
+    (.setWithPayload builder (WithPayloadSelectorFactory/enable true))
     (mapv scored-point->clj
-          (wait (.searchAsync client (.build builder))))))
+          (wait (.queryAsync client ^Points$QueryPoints (.build builder))))))
 
 (defn scroll-points
   [^QdrantClient client {:keys [collection-name filter limit]}]
