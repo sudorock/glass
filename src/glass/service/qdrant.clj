@@ -3,7 +3,7 @@
    [com.google.common.util.concurrent ListenableFuture]
    [io.grpc ManagedChannel ManagedChannelBuilder]
    [io.qdrant.client PointIdFactory QdrantClient QdrantGrpcClient QdrantGrpcClient$Builder QueryFactory ValueFactory VectorFactory VectorsFactory WithPayloadSelectorFactory]
-   [io.qdrant.client.grpc Collections$CreateCollection Collections$CreateCollection$Builder Collections$Distance Collections$Modifier Collections$PayloadSchemaType Collections$SparseVectorConfig Collections$SparseVectorConfig$Builder Collections$SparseVectorParams Collections$SparseVectorParams$Builder Collections$VectorParams Collections$VectorParams$Builder Collections$VectorParamsMap Collections$VectorParamsMap$Builder Collections$VectorsConfig Collections$VectorsConfig$Builder]
+   [io.qdrant.client.grpc Collections$CreateCollection Collections$CreateCollection$Builder Collections$Distance Collections$Modifier Collections$PayloadIndexParams Collections$PayloadIndexParams$Builder Collections$PayloadSchemaType Collections$SparseVectorConfig Collections$SparseVectorConfig$Builder Collections$SparseVectorParams Collections$SparseVectorParams$Builder Collections$TextIndexParams Collections$TextIndexParams$Builder Collections$TokenizerType Collections$VectorParams Collections$VectorParams$Builder Collections$VectorParamsMap Collections$VectorParamsMap$Builder Collections$VectorsConfig Collections$VectorsConfig$Builder]
    [io.qdrant.client.grpc Common$Filter Common$PointId]
    [io.qdrant.client.grpc JsonWithInt$Value]
    [io.qdrant.client.grpc Points$Document Points$Document$Builder Points$Fusion Points$PointStruct Points$PointStruct$Builder Points$PointsIdsList Points$PointsIdsList$Builder Points$PointsSelector Points$PointsSelector$Builder Points$PrefetchQuery Points$PrefetchQuery$Builder Points$Query Points$QueryPoints Points$QueryPoints$Builder Points$RetrievedPoint Points$Rrf Points$Rrf$Builder Points$ScoredPoint Points$ScrollPoints Points$ScrollPoints$Builder Points$ScrollResponse Points$SetPayloadPoints Points$SetPayloadPoints$Builder Points$Vector]
@@ -42,6 +42,14 @@
   (case x
     :idf Collections$Modifier/Idf
     :none Collections$Modifier/None))
+
+(defn- tokenizer
+  [x]
+  (case x
+    :word Collections$TokenizerType/Word
+    :whitespace Collections$TokenizerType/Whitespace
+    :prefix Collections$TokenizerType/Prefix
+    :multilingual Collections$TokenizerType/Multilingual))
 
 (defn- field-name
   [x]
@@ -236,6 +244,25 @@
     (.setModifier builder (modifier (:modifier opts)))
     (.build builder)))
 
+(defn- ->text-index-params
+  ^Collections$TextIndexParams
+  [{:keys [min-token-len max-token-len lowercase ascii-folding] :as opts}]
+  (let [^Collections$TextIndexParams$Builder builder (Collections$TextIndexParams/newBuilder)]
+    (when (:tokenizer opts) (.setTokenizer builder (tokenizer (:tokenizer opts))))
+    (when min-token-len (.setMinTokenLen builder (int min-token-len)))
+    (when max-token-len (.setMaxTokenLen builder (int max-token-len)))
+    (when (some? lowercase) (.setLowercase builder (boolean lowercase)))
+    (when (some? ascii-folding) (.setAsciiFolding builder (boolean ascii-folding)))
+    (.build builder)))
+
+(defn- ->payload-index-params
+  ^Collections$PayloadIndexParams
+  [{:keys [text]}]
+  (when text
+    (let [^Collections$PayloadIndexParams$Builder builder (Collections$PayloadIndexParams/newBuilder)]
+      (.setTextIndexParams builder (->text-index-params text))
+      (.build builder))))
+
 (defn create-collection
   [^QdrantClient client {:keys [collection-name vectors sparse-vectors]}]
   (let [^Collections$VectorParamsMap$Builder vpm (Collections$VectorParamsMap/newBuilder)
@@ -260,7 +287,7 @@
          collection-name
          (field-name field)
          (schema-type (:schema-type opts))
-         nil
+         (->payload-index-params opts)
          nil
          nil
          nil))
