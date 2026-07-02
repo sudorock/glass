@@ -16,7 +16,7 @@ Glass is currently consumed as a Git dependency.
 
 ```clojure
 sudorock/glass {:git/url "https://github.com/sudorock/glass"
-                :git/sha "ad28c756a8d5ed1a67c9346e9d9be770ee8504ab"}
+                :git/sha "947aa43cc43abb0c55f105b77cf9ef47badf208f"}
 ```
 
 Pin to the commit or tag you want to depend on.
